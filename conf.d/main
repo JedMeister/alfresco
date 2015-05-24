@@ -11,9 +11,11 @@ ADMIN_MAIL=admin@example.com
 DOMAIN=www.example.com
 
 SRC=/usr/local/src
-WEBAPPS=/var/lib/tomcat7/webapps
+CATALINA_HOME=/usr/share/tomcat7
+CATALINA_BASE=/var/lib/tomcat7
+WEBAPPS=$CATALINA_BASE/webapps
 BASE_DIR=/var/local/lib/alfresco
-CONF=/etc/alfresco/alfresco-global.properties
+CONF=$(dirname $WEBAPPS)/shared/classes/alfresco-global.properties
 
 mkdir -p $BASE_DIR
 
@@ -22,16 +24,38 @@ ALF_SRC=$SRC/alfresco-community-*
 unzip $ALF_SRC.zip -d $SRC
 rm $SRC/alfresco-community-*.zip
 
-
 mv $ALF_SRC/alf_data/ $BASE_DIR
 
+mv $ALF_SRC/web-server/shared $CATALINA_BASE/
+#mv $ALF_SRC/web-server/
+
+mv $ALF_SRC/web-server/bin $CATALINA_HOME/
+mv $ALF_SRC/web-server/lib $CATALINA_HOME/
+
+ln -s $CATALINA_BASE/common/ $CATALINA_HOME/common
+ln -s $CATALINA_BASE/server/ $CATALINA_HOME/server
+ln -s $CATALINA_BASE/shared/ $CATALINA_HOME/shared
+
+
+mv $ALF_SRC/web-server/webapps/*.war $WEBAPPS/
+mv $WEBAPPS/alfresco.war $WEBAPPS/ROOT.war
 #mkdir $(dirname $CONF)
 #mv $ALF_SRC/web-server/shared/classes/alfresco-global.properties.sample $CONF
 
+ln -s $CONF /etc/alfresco/alfresco-global.properties
+
+chown -R tomcat7:tomcat7 /var/lib/tomcat7/
+chown -R tomcat7:tomcat7 /var/local/lib/alfresco/
+
+[/usr/share/tomcat7/common/classes], exists: [false], isDirectory: [false], canRead: [false]
+[/usr/share/tomcat7/common], exists: [false], isDirectory: [false], canRead: [false]
+[/usr/share/tomcat7/server/classes], exists: [false], isDirectory: [false], canRead: [false]
+[/usr/share/tomcat7/server], exists: [false], isDirectory: [false], canRead: [false]
+[/usr/share/tomcat7/shared/classes], exists: [false], isDirectory: [false], canRead: [false]
+[/usr/share/tomcat7/shared], exists: [false], isDirectory: [false], canRead: [false]
 
 
 #rm -rf $WEBAPPS/ROOT
-mv $ALF_SRC/web-server/webapps/*.war $WEBAPPS/
 
 # tweak configuration, set in tomcat environment and create base_dir
 #CONF=/etc/alfresco/
