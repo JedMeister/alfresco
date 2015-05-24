@@ -1,0 +1,90 @@
+#!/bin/sh -ex
+
+DB_NAME=alfresco
+DB_USER=alfresco
+DB_PASS=$(mcookie)
+
+ADMIN_NAME=admin
+ADMIN_PASS=turnkey
+ADMIN_MAIL=admin@example.com
+DOMAIN=www.example.com
+
+SRC=/usr/local/src
+WEBAPPS=/var/lib/tomcat7/webapps
+BASE_DIR=/var/local/lib/alfresco
+
+# unpack and drop war into webapps
+unzip $SRC/alfresco_*.zip -d $SRC
+#rm $SRC/alfresco_*.zip
+
+rm -rf $WEBAPPS/ROOT
+mv $SRC/alfresco.war $WEBAPPS/ROOT.war
+
+# tweak configuration, set in tomcat environment and create base_dir
+CONF=/etc/alfresco/config.groovy
+
+sed -i "s|DB_NAME|$DB_NAME|" $CONF
+sed -i "s|DB_USER|$DB_USER|" $CONF
+sed -i "s|DB_PASS|$DB_PASS|" $CONF
+sed -i "s|BASE_DIR|$BASE_DIR|" $CONF
+
+echo "alfresco_config_location=$CONF" >> /etc/default/tomcat7
+
+chown tomcat7:tomcat7 $CONF
+chmod 640 $CONF
+
+mkdir -p $BASE_DIR
+chown -R tomcat7:tomcat7 $BASE_DIR
+
+# allow binding to 80/443
+echo AUTHBIND=yes >> /etc/default/tomcat7
+touch /etc/authbind/byport/443
+chmod 500 /etc/authbind/byport/443
+chown tomcat7 /etc/authbind/byport/443
+touch /etc/authbind/byport/80
+chmod 500 /etc/authbind/byport/80
+chown tomcat7 /etc/authbind/byport/80
+
+# java not connecting to MySQL without this
+ln -s /usr/share/java/mysql.jar /usr/share/tomcat7/lib/mysql.jar
+
+# increase memory defaults
+echo "JAVA_OPTS=\"\${JAVA_OPTS} -Xmx512M -XX:MaxPermSize=512M\"" >> /etc/default/tomcat7
+
+# modify tomcat connectors protocol required by alfresco
+CONF=/etc/tomcat7/server.xml
+sed -i "s|HTTP\/1.1|org.apache.coyote.http11.Http11NioProtocol|" $CONF
+
+# update local policy permissions
+cat >>/etc/tomcat7/policy.d/50local.policy<<EOF
+grant codeBase "file:\${catalina.base}/webapps/ROOT/-" {
+    permission java.security.AllPermission;
+};
+grant {
+    permission java.net.SocketPermission "localhost:3306", "connect, resolve";
+};
+EOF
+
+# generate tomcat keystore from default ssl certificate
+/usr/lib/inithooks/firstboot.d/16tomcat-sslcert
+
+# setup the database
+/etc/init.d/mysql start
+
+MYSQL_BATCH="mysql --user=root --password=$MYSQL_PASS --batch"
+MYSQL_ADMIN="mysqladmin --user=root --password=$MYSQL_PASS"
+
+$MYSQL_ADMIN create $DB_NAME
+$MYSQL_BATCH --execute "grant all privileges on $DB_NAME.* to $DB_USER@localhost identified by '$DB_PASS'; flush privileges;"
+
+# initialize alfresco
+/etc/init.d/tomcat7 start
+curl --retry 10 --retry-delay 10 --max-time 300 http://localhost/
+/etc/init.d/tomcat7 stop
+
+# set default configuration
+/usr/lib/inithooks/bin/alfresco.py --pass=$ADMIN_PASS --email=$ADMIN_MAIL --domain=$DOMAIN
+
+# stop mysql
+/etc/init.d/mysql stop
+

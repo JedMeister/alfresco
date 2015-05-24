@@ -1,0 +1,19 @@
+#include <turnkey/base>
+#include <turnkey/tomcat>
+
+ant
+
+openjdk-7-jdk
+openjdk-7-jre
+
+authbind        /* Allows non-root programs to bind() to low ports */
+
+mysql-server
+libmysql-java
+webmin-mysql
+
+postfix
+webmin-postfix
+
+unzip
+
