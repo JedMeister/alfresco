@@ -17,3 +17,5 @@ webmin-postfix
 
 unzip
 
+/* libreoffice-core /* Required for viewing docs online */
+/* libreoffice-common /* This is a (much smaller download but unsure if it works... */
